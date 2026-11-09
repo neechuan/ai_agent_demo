@@ -105,7 +105,15 @@ async def lifespan(_app: FastAPI):
         shutdown_telemetry()
 
 
-app = FastAPI(title="Vendor-Agnostic AI Agent Chat Demo", lifespan=lifespan)
+# FastAPI's native tracing (on by default once a TracerProvider exists) would wrap
+# each request in an untagged server span that becomes the trace root. Lacking
+# domain.name and gen_ai.*, the Collector routes it to the default log stream where
+# Galileo drops it, leaving the per-domain stream with a rootless (invisible) trace.
+app = FastAPI(
+    title="Vendor-Agnostic AI Agent Chat Demo",
+    lifespan=lifespan,
+    telemetry={"tracing": False},
+)
 
 app.add_middleware(
     CORSMiddleware,

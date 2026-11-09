@@ -6,7 +6,8 @@ embedding_model="${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"
 ollama_log="${TMPDIR:-/tmp}/ai-agent-demo-ollama.log"
 
 # Load environment variables from the Splunk .env file for APM & DBmon instrumentation
-splunk_env="/Users/shawsong/repo/demoAppsTemplate/splunk/.env"
+#splunk_env="/Users/shawsong/repo/demoAppsTemplate/splunk/.env"
+splunk_env=".env"
 [ -f "$splunk_env" ] && source "$splunk_env"
 
 

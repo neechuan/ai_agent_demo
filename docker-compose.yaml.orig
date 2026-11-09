@@ -1,0 +1,106 @@
+# Local laptop demo: backend (serves UI) + Ollama (tiny model) + OTel Collector.
+# Cloud providers (OpenAI / OpenRouter) are reached over the internet via .env.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      # Reuse the host Ollama model store instead of duplicating large models.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
+      OLLAMA_EMBEDDING_BASE_URL: http://host.docker.internal:11434
+      POSTGRES_URL: postgresql+psycopg://postgres:postgres@postgres:5432/vectordb
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Host 8800 avoids a local Splunk Web (8000) conflict; container stays 8000.
+      - "8800:8000"
+    depends_on:
+      ollama-check:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  ollama-check:
+    image: curlimages/curl:8.12.1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      OLLAMA_HOST_URL: http://host.docker.internal:11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        echo "Checking host Ollama at $${OLLAMA_HOST_URL}..."
+        models="$$(curl --fail --silent --show-error --max-time 5 "$${OLLAMA_HOST_URL}/api/tags")" || {
+          echo >&2 "Ollama is not reachable. Start it with: ollama serve"
+          exit 1
+        }
+        echo "$${models}" | grep -q "$${OLLAMA_EMBEDDING_MODEL}" || {
+          echo >&2 "Required embedding model '$${OLLAMA_EMBEDDING_MODEL}' is missing."
+          echo >&2 "Install it with: ollama pull $${OLLAMA_EMBEDDING_MODEL}"
+          exit 1
+        }
+        echo "Ollama is ready with $${OLLAMA_EMBEDDING_MODEL}."
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vectordb
+    networks:
+      default:
+       aliases:
+         - shawn-sao-demo-postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vectordb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: 
+      - "--config=/etc/otelcol/config.yaml"
+      - "--config=/etc/otelcol/otel-collector.apm-dbmon.yaml"
+    env_file: .env
+    environment:
+      SPLUNK_REALM: ${SPLUNK_REALM}
+      SPLUNK_ACCESS_TOKEN: ${SPLUNK_ACCESS_TOKEN}
+      SPLUNK_LOCAL_HEC: ${SPLUNK_LOCAL_HEC}
+      DBMON_PG_USER: otelu
+      DBMON_PG_PASSWORD: otelu
+    volumes:
+      # Default = Galileo. Options for OTEL_COLLECTOR_CONFIG (in .env):
+      #   otel-collector.galileo.yaml | otel-collector.langfuse.yaml |
+      #   otel-collector.galileo-langfuse.yaml (both).
+      #   otel-collector.apm-dbmon.yaml is always merged: Splunk O11y APM traces + DB monitoring.
+      - ./observability/collector/otel-collector.galileo.yaml:/etc/otelcol/config.yaml:ro
+      - ./observability/collector/otel-collector.apm-dbmon.yaml:/etc/otelcol/otel-collector.apm-dbmon.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres:

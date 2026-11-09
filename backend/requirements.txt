@@ -1,5 +1,6 @@
 # Web / API
-fastapi>=0.115
+# >=0.162 for the native `telemetry=` option (main.py disables its tracing).
+fastapi>=0.162
 uvicorn[standard]>=0.30
 pydantic>=2.7
 pydantic-settings>=2.3
@@ -23,6 +24,7 @@ opentelemetry-instrumentation-fastapi>=0.48b0
 # conventions that Galileo's OTLP provider requires to classify spans, in one
 # coherent agent -> LLM -> tool trace. Vendor-neutral (works with any OTLP backend).
 opentelemetry-instrumentation-langchain
+#splunk-otel-instrumentation-langchain
 
 # Optional Galileo Agent Control (only used when AGENT_CONTROL_ENABLED=true).
 galileo>=2.3.0

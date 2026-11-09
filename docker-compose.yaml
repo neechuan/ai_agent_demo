@@ -79,8 +79,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     command: 
-      - "--config=/etc/otelcol/config.yaml"
-      - "--config=/etc/otelcol/otel-collector.apm-dbmon.yaml"
+      - "--config=/etc/otelcol/otel-collector.galileo.yaml"
     env_file: .env
     environment:
       SPLUNK_REALM: ${SPLUNK_REALM}
@@ -93,7 +92,7 @@ services:
       #   otel-collector.galileo.yaml | otel-collector.langfuse.yaml |
       #   otel-collector.galileo-langfuse.yaml (both).
       #   otel-collector.apm-dbmon.yaml is always merged: Splunk O11y APM traces + DB monitoring.
-      - ./observability/collector/${OTEL_COLLECTOR_CONFIG:-otel-collector.galileo.yaml}:/etc/otelcol/config.yaml:ro
+      - ./observability/collector/otel-collector.galileo.yaml:/etc/otelcol/otel-collector.galileo.yaml:ro
       - ./observability/collector/otel-collector.apm-dbmon.yaml:/etc/otelcol/otel-collector.apm-dbmon.yaml:ro
     ports:
       - "4317:4317"

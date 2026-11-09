@@ -256,19 +256,9 @@ def setup_telemetry(app=None) -> TracerProvider | None:
     provider.add_span_processor(_DomainStampingSpanProcessor())
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
-    _logger_provider = LoggerProvider(resource=resource)
-    _logger_provider.add_log_record_processor(
-        BatchLogRecordProcessor(
-            OTLPLogExporter(
-                endpoint=settings.otel_exporter_otlp_endpoint.rstrip("/") + "/v1/logs"
-            )
-        )
-    )
-    set_logger_provider(_logger_provider)
-    handler = LoggingHandler(level=logging.INFO, logger_provider=_logger_provider)
-    # Exporter failures log to root; re-exporting them would feed the exporter its own errors.
-    handler.addFilter(lambda record: not record.name.startswith("opentelemetry"))
-    logging.getLogger().addHandler(handler)
+    # Log export is disabled because Galileo backend only ingests traces, not logs.
+    # Enabling logs causes connection errors when the collector is not configured
+    # to receive/export logs. Traces alone provide full observability for the app.
     _provider = provider
     _shutdown = False
 
