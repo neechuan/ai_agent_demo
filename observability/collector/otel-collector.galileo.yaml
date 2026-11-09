@@ -15,6 +15,23 @@ receivers:
 processors:
   batch: {}
 
+  # Galileo-bound pipelines only. The app roots each trace at a "POST /chat"
+  # SERVER span (scope agent_chat.http) so Splunk APM sees a service entry point.
+  # It carries no gen_ai.* attributes, so Galileo rejects it ("No GenAI patterns
+  # detected in spans", partial success) and the GenAI turn span is left
+  # pointing at a parent that never arrives. For these backends, promote the
+  # "invoke_agent Agent Chat" turn span to the trace root and drop the HTTP span.
+  # traces/in (and the Splunk exporter merged onto it) still receives both.
+  transform/genai_root:
+    error_mode: ignore
+    trace_statements:
+      - set(span.parent_span_id, SpanID(0x0000000000000000)) where instrumentation_scope.name == "agent_chat.turn"
+  filter/drop_http_root:
+    error_mode: ignore
+    traces:
+      span:
+        - instrumentation_scope.name == "agent_chat.http"
+
 exporters:
   # ---- Galileo: ingests the OTel GenAI spans this app already emits. ---------
   # One exporter per domain: identical Galileo project/key, but a distinct
@@ -90,19 +107,19 @@ connectors:
     default_pipelines: [traces/galileo_default]
     table:
       - context: span
-        condition: attributes["domain.name"] == "bank"
+        condition: span.attributes["domain.name"] == "bank"
         pipelines: [traces/galileo_bank]
       - context: span
-        condition: attributes["domain.name"] == "healthcare"
+        condition: span.attributes["domain.name"] == "healthcare"
         pipelines: [traces/galileo_healthcare]
       - context: span
-        condition: attributes["domain.name"] == "insurance"
+        condition: span.attributes["domain.name"] == "insurance"
         pipelines: [traces/galileo_insurance]
       - context: span
-        condition: attributes["domain.name"] == "restaurant"
+        condition: span.attributes["domain.name"] == "restaurant"
         pipelines: [traces/galileo_restaurant]
       - context: span
-        condition: attributes["domain.name"] == "platform"
+        condition: span.attributes["domain.name"] == "platform"
         pipelines: [traces/galileo_platform]
 
 service:
@@ -114,19 +131,25 @@ service:
       exporters: [routing]
     traces/galileo_bank:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_bank]
     traces/galileo_healthcare:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_healthcare]
     traces/galileo_insurance:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_insurance]
     traces/galileo_restaurant:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_restaurant]
     traces/galileo_platform:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_platform]
     traces/galileo_default:
       receivers: [routing]
+      processors: [transform/genai_root, filter/drop_http_root]
       exporters: [otlp_http/galileo_default]

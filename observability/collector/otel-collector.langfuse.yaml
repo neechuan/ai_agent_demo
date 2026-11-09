@@ -95,19 +95,19 @@ connectors:
     default_pipelines: [traces/langfuse_default]
     table:
       - context: span
-        condition: attributes["domain.name"] == "bank"
+        condition: span.attributes["domain.name"] == "bank"
         pipelines: [traces/langfuse_bank]
       - context: span
-        condition: attributes["domain.name"] == "healthcare"
+        condition: span.attributes["domain.name"] == "healthcare"
         pipelines: [traces/langfuse_healthcare]
       - context: span
-        condition: attributes["domain.name"] == "insurance"
+        condition: span.attributes["domain.name"] == "insurance"
         pipelines: [traces/langfuse_insurance]
       - context: span
-        condition: attributes["domain.name"] == "restaurant"
+        condition: span.attributes["domain.name"] == "restaurant"
         pipelines: [traces/langfuse_restaurant]
       - context: span
-        condition: attributes["domain.name"] == "platform"
+        condition: span.attributes["domain.name"] == "platform"
         pipelines: [traces/langfuse_platform]
 
 service:

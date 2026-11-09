@@ -284,7 +284,9 @@ the Collector fails to start on an empty realm.
   (Galileo/Langfuse) *and* to Splunk O11y. Because each trace is rooted at a
   `SERVER` span, the app appears in APM under Applications & services as
   `agent-chat-demo` with endpoint `POST /chat`. The same spans carry `gen_ai.*`
-  attributes, so they also appear under Agent Observability.
+  attributes, so they also appear under Agent Observability. The Galileo/Langfuse
+  pipelines drop that `SERVER` span (Galileo rejects non-GenAI spans) and promote
+  `invoke_agent Agent Chat` to the trace root; APM still receives it.
 - **Database Monitoring** — a `postgresql` receiver scrapes the demo's pgvector
   instance for metrics, query samples and top queries. The Compose network alias
   `shawn-sao-demo-postgres` is what DBMon keys the instance on, so the demo is

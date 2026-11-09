@@ -92,3 +92,36 @@ A test chat (`domain=platform`) through the fixed app gave these results:
 - Every span needs `domain.name` (stamped by `_DomainStampingSpanProcessor` in
   `otel.py`). Any span created outside that scope, such as by a framework's
   auto-instrumentation, splits the trace across log streams.
+
+## Galileo drops the `POST /chat` root span (partial success, 1 span)
+
+**Resolved:** 2026-11-09
+
+### Symptom
+
+After a chat turn the Collector logged a partial success from the per-domain
+exporter (for example `otlp_http/galileo_platform`): `Group 0: No GenAI patterns
+detected in spans ...`, `"dropped_spans": 1`.
+
+### Root cause
+
+`start_server_span()` in [backend/app/telemetry/otel.py](../backend/app/telemetry/otel.py)
+roots every turn at a `POST /chat` `SERVER` span (scope `agent_chat.http`) so
+Splunk APM gets a service entry point. That span has `domain.name` but no
+`gen_ai.*` attributes, so it is routed to the domain stream and Galileo rejects
+it. That leaves the `invoke_agent Agent Chat` turn span with a parent that never
+arrives. The warning appears when the root span, which ends last, is exported in
+a batch by itself.
+
+### Fix
+
+The Collector handles this because it owns the backend-specific settings. In
+`otel-collector.galileo.yaml` and `otel-collector.galileo-langfuse.yaml`, each
+per-domain pipeline now runs:
+
+- `transform/genai_root`: clears `parent_span_id` on the `agent_chat.turn` span,
+  making `invoke_agent Agent Chat` the trace root.
+- `filter/drop_http_root`: drops the `agent_chat.http` span.
+
+`traces/in`, along with the Splunk APM exporter merged onto it, still receives
+the full trace, including the `SERVER` span.
